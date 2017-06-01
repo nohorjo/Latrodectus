@@ -209,3 +209,4 @@ ENV/
 
 .idea/*
 gitignore/*
+*.db

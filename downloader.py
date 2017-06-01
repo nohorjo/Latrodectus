@@ -7,8 +7,9 @@ from bs4 import BeautifulSoup
 
 try:
     vUrl = sys.argv[1]
+    outDir = sys.argv[2]
 except IndexError:
-    print "Error: provide a url"
+    print "Error: provide a url and output directory"
     exit(1)
 
 # uses savido to download video
@@ -21,4 +22,4 @@ soup = BeautifulSoup(doc, "lxml")
 vid = soup.select("td > a")[0].get("href")
 
 vUrl = vUrl[:-1]
-urllib.urlretrieve(vid, "vid/%s.mp4" % vUrl[vUrl.rfind("/"):])
+urllib.urlretrieve(vid, "%s/%s.mp4" % (outDir, vUrl[vUrl.rfind("/"):]))
