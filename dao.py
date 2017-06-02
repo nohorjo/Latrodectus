@@ -27,26 +27,36 @@ def init():
             ''')
         conn.execute('''
             CREATE TABLE VIDEOS (
+                ID INTEGER,
                 URL TEXT PRIMARY KEY NOT NULL,
                 SITEID INTEGER NOT NULL REFERENCES SITES(ID),
                 CHECKED TINYINT NOT NULL DEFAULT 0
             );''')
     except sqlite3.OperationalError:
         pass
-
     conn.close()
 
 
 def addUrl(siteid, url):
-    try:
-        conn = sqlite3.connect(dbname)
-        cur = conn.cursor()
-        cur.execute("INSERT INTO VIDEOS (SITEID, URL) VALUES (:siteid,:url);", {"siteid": siteid, "url": url})
-        conn.commit()
-        conn.close()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO VIDEOS (ID,SITEID, URL) VALUES ((SELECT IFNULL(MAX(ID), 0) + 1 FROM VIDEOS),:siteid,:url);",
+        {"siteid": siteid, "url": url})
+    conn.commit()
+    conn.close()
+
+
+def siteAdded(siteid, url):
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM VIDEOS WHERE SITEID=:siteid AND URL=:url;", {"siteid": siteid, "url": url})
+    result = False
+    for row in cur:
+        if int(row[0]) > 0:
+            result = True
+    conn.close()
+    return result
 
 
 def setChecked(url):
@@ -66,21 +76,25 @@ def getUnchecked():
 
 
 def isBlackListed(tags):
+    tags = [str(x).strip() for x in tags]
     conn = sqlite3.connect(dbname)
     sql = "SELECT COUNT(*) FROM BLACKLIST WHERE TERM IN ("
     i = 0;
     t = "{"
     for tag in tags:
+        tag = tag.replace("'", "\\'")
         sql += ":tag" + str(i) + ","
         t += "'tag" + str(i) + "':'''" + tag.lower() + "''',"
         i += 1
     sql = sql[:-1] + ");"
     t = t[:-1] + "}"
     cur = conn.execute(sql, eval(t))
+    result = False
     for row in cur:
         if int(row[0]) > 0:
-            return True
-    return False
+            result = True
+    conn.close()
+    return result
 
 
 def getSites():
@@ -92,5 +106,12 @@ def getSites():
         for val in row:
             site.append(str(val))
         sites.append(site)
+
+    for site in sites:
+        break
+        cur = conn.execute("SELECT URL FROM VIDEOS WHERE ID = (SELECT MAX(ID) FROM VIDEOS WHERE SITEID = :siteid);",
+                           {"siteid": site[0]})
+        for val in cur:
+            site[1] = str(val[0])
     conn.close()
     return sites
