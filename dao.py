@@ -37,32 +37,37 @@ def init():
     conn.close()
 
 
-def addUrl(siteid, url):
-    conn = sqlite3.connect(dbname)
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO VIDEOS (ID,SITEID, URL) VALUES ((SELECT IFNULL(MAX(ID), 0) + 1 FROM VIDEOS),:siteid,:url);",
-        {"siteid": siteid, "url": url})
-    conn.commit()
-    conn.close()
+def addUrl(siteid, url, checkedstatus):
+    while True:
+        try:
+            conn = sqlite3.connect(dbname)
+            if checkedstatus == -1:
+                cs = vidStatus(url)
+                if cs >= 0:
+                    checkedstatus = 2 + cs
+            conn.execute(
+                "REPLACE INTO VIDEOS (ID, SITEID, URL, CHECKED) VALUES ((SELECT IFNULL(MAX(ID), 0) + 1 FROM VIDEOS),:siteid,:url,:checked);",
+                {"siteid": siteid, "url": url, "checked": checkedstatus})
+            conn.commit()
+            conn.close()
+        except sqlite3.OperationalError:
+            pass
+        break
 
 
-def siteAdded(siteid, url):
-    conn = sqlite3.connect(dbname)
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM VIDEOS WHERE SITEID=:siteid AND URL=:url;", {"siteid": siteid, "url": url})
-    result = False
-    for row in cur:
-        if int(row[0]) > 0:
-            result = True
-    conn.close()
-    return result
-
-
-def setChecked(url):
-    conn = sqlite3.connect(dbname)
-    conn.execute("UPDATE VIDEOS SET CHECKED = 1 WHERE URL = :url;", {"url": url})
-    conn.close()
+def vidStatus(url):
+    while True:
+        try:
+            conn = sqlite3.connect(dbname)
+            cur = conn.cursor()
+            cur.execute("SELECT CHECKED FROM VIDEOS WHERE URL=:url;", {"url": url})
+            result = -1
+            for row in cur:
+                result = int(row[0])
+            conn.close()
+            return result
+        except sqlite3.OperationalError:
+            pass
 
 
 def getUnchecked():
@@ -76,42 +81,66 @@ def getUnchecked():
 
 
 def isBlackListed(tags):
-    tags = [str(x).strip() for x in tags]
-    conn = sqlite3.connect(dbname)
-    sql = "SELECT COUNT(*) FROM BLACKLIST WHERE TERM IN ("
-    i = 0;
-    t = "{"
-    for tag in tags:
-        tag = tag.replace("'", "\\'")
-        sql += ":tag" + str(i) + ","
-        t += "'tag" + str(i) + "':'''" + tag.lower() + "''',"
-        i += 1
-    sql = sql[:-1] + ");"
-    t = t[:-1] + "}"
-    cur = conn.execute(sql, eval(t))
-    result = False
-    for row in cur:
-        if int(row[0]) > 0:
-            result = True
-    conn.close()
-    return result
+    while True:
+        try:
+            result = False
+            tags = [str(x).strip() for x in tags]
+            if len(tags) != 0:
+                conn = sqlite3.connect(dbname)
+                sql = "SELECT COUNT(*) FROM BLACKLIST WHERE TERM IN ("
+                i = 0;
+                t = "{"
+                for tag in tags:
+                    tag = tag.replace("'", "\\'")
+                    sql += ":tag" + str(i) + ","
+                    t += "'tag" + str(i) + "':'''" + tag.lower() + "''',"
+                    i += 1
+                sql = sql[:-1] + ");"
+                t = t[:-1] + "}"
+                cur = conn.execute(sql, eval(t))
+                for row in cur:
+                    if int(row[0]) > 0:
+                        result = True
+                conn.close()
+            return result
+        except sqlite3.OperationalError:
+            pass
 
 
 def getSites():
-    sites = []
-    conn = sqlite3.connect(dbname)
-    cur = conn.execute("SELECT ID, SITE, LINK, NAME, DURATION, DATE, TAGS FROM SITES;")
-    for row in cur:
-        site = []
-        for val in row:
-            site.append(str(val))
-        sites.append(site)
+    while True:
+        try:
+            sites = []
+            conn = sqlite3.connect(dbname)
+            cur = conn.execute("SELECT ID, SITE, LINK, NAME, DURATION, DATE, TAGS FROM SITES;")
+            for row in cur:
+                site = []
+                for val in row:
+                    site.append(str(val))
+                sites.append(site)
+            conn.close()
+            return sites
+        except sqlite3.OperationalError:
+            pass
 
-    for site in sites:
-        break
-        cur = conn.execute("SELECT URL FROM VIDEOS WHERE ID = (SELECT MAX(ID) FROM VIDEOS WHERE SITEID = :siteid);",
-                           {"siteid": site[0]})
-        for val in cur:
-            site[1] = str(val[0])
+
+def getResumeUrl(urlid, url):
+    while True:
+        try:
+            conn = sqlite3.connect(dbname)
+            cur = conn.execute(
+                '''SELECT URL FROM VIDEOS WHERE ID = (SELECT ID FROM VIDEOS WHERE SITEID = :siteid AND CHECKED < 2
+                    ORDER BY RANDOM() LIMIT 1);''',
+                {"siteid": urlid})
+            for val in cur:
+                url = str(val[0])
+            conn.close()
+            return url
+        except sqlite3.OperationalError:
+            pass
+
+
+def clean():
+    conn = sqlite3.connect(dbname)
+    conn.execute("DELETE FROM VIDEOS WHERE URL IN (SELECT SITE FROM SITES);")
     conn.close()
-    return sites
