@@ -20,43 +20,59 @@ def getDocSoup(url):
     return BeautifulSoup(doc, "lxml")
 
 
-def getVidUrl(link, url, nameExtractor, durationExtractor):
-    vidurl = link.get("href")
-    error = False
-    if vidurl is None:
-        vidurl = link["u"]
-        name = link["t"]
-        durString = link["d"]
-        print vidurl
-    else:
-        print vidurl
-        name = str(filter(lambda x: x in set(string.printable), eval(nameExtractor)))
-        print "\tname: " + name
-        durString = eval(durationExtractor)
-    duration = int(re.sub("[^\\d]", "", durString))
-    print "\tduration: " + str(duration)
-    if duration not in range(10, 25) or dao.isBlackListed(
-            name.split(" ")):
-        print "\t--Duration/name check failed"
-        error = True
-    if not vidurl.startswith("http"):
-        urlRootIndex = url.find("/", 9)
+def compoundUrl(root, path):
+    if not path.startswith("http"):
+        urlRootIndex = root.find("/", 9)
         if urlRootIndex != -1:
-            url = url[:urlRootIndex]
-        vidurl = url + vidurl
-    return {"url": str(vidurl), "error": error}
+            url = root[:urlRootIndex]
+        path = url + path
+    return path
+
+
+def getVidUrl(link, url, nameExtractor, durationExtractor):
+    try:
+        vidurl = link.get("href")
+        error = False
+        if vidurl is None:
+            vidurl = link["u"]
+            name = link["t"]
+            durString = link["d"]
+            vidurl = compoundUrl(url, vidurl)
+            print vidurl
+        else:
+            vidurl = compoundUrl(url, vidurl)
+            print vidurl
+            name = eval(nameExtractor)
+            print "\tname: " + name
+            durString = eval(durationExtractor)
+        name = str(filter(lambda x: x in set(string.printable), name))
+        duration = int(re.sub("[^\\d]", "", durString))
+        print "\tduration: " + str(duration)
+        if duration not in range(10, 25) or dao.isBlackListed(
+                name.split(" ")):
+            print "\t--Duration/name check failed"
+            error = True
+
+        return {"url": str(vidurl), "error": error}
+    except:
+        print >> sys.stderr, "GU error " + vidurl
+        raise
 
 
 def dateTagCheck(dateCheck, tagsExtractor, vidurl):
-    error = False
-    vidpage = getDocSoup(vidurl)
-    tags = []
-    for tag in vidpage.select(tagsExtractor):
-        tags.append(tag.get_text())
-    if not eval(dateCheck) and dao.isBlackListed(tags):
-        print "\t--Date/tag check failed"
-        error = True
-    return error
+    try:
+        error = False
+        vidpage = getDocSoup(vidurl)
+        tags = []
+        for tag in vidpage.select(tagsExtractor):
+            tags.append(tag.get_text())
+        if not eval(dateCheck) and dao.isBlackListed(tags):
+            print "\t--Date/tag check failed"
+            error = True
+        return error
+    except:
+        print >> sys.stderr, "DT error " + vidurl
+        raise
 
 
 def getLinks(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCheck, tagsExtractor):
@@ -81,7 +97,7 @@ def getLinks(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCh
             else:
                 print "\t--Duplicate video"
         except Exception, e:
-            print >> sys.stderr, type(e).__name__ + " " + str(e) + " " + url
+            print >> sys.stderr, "GL " + type(e).__name__ + " " + str(e) + " " + url
 
     dao.addUrl(urlid, url, -1)
 
@@ -94,18 +110,19 @@ def startCrawl(urlid, url, linkExtractor, nameExtractor, durationExtractor, date
         try:
             getLinks(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCheck, tagsExtractor)
         except Exception, e:
-            print >> sys.stderr, type(e).__name__ + " " + str(e) + " " + url
+            print >> sys.stderr, "SC " + type(e).__name__ + " " + str(e) + " " + url
             traceback.print_exc()
+        print "Finished crawl: " + url
 
 
 threads = []
-for site in dao.getSites():
-#for site in [dao.getSites()[3]]:
+sites = dao.getSites()
+for site in sites:
+#for site in (sites[2], sites[5],):
     t = Thread(target=startCrawl, args=(site[0], site[1], site[2], site[3], site[4], site[5], site[6]))
     t.setDaemon(True)
     t.start()
     threads.append(t)
-#    break
 
 running = True
 while running:

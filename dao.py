@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 
 import sqlite3
+import sys
 
 dbname = "videos.db"
 
@@ -51,7 +52,7 @@ def addUrl(siteid, url, checkedstatus):
             conn.commit()
             conn.close()
         except sqlite3.OperationalError:
-            pass
+            print >> sys.stderr, "OperationalError"
         break
 
 
@@ -67,7 +68,7 @@ def vidStatus(url):
             conn.close()
             return result
         except sqlite3.OperationalError:
-            pass
+             print >> sys.stderr, "OperationalError"
 
 
 def getUnchecked():
@@ -104,7 +105,7 @@ def isBlackListed(tags):
                 conn.close()
             return result
         except sqlite3.OperationalError:
-            pass
+            print >> sys.stderr, "OperationalError"
 
 
 def getSites():
@@ -121,7 +122,7 @@ def getSites():
             conn.close()
             return sites
         except sqlite3.OperationalError:
-            pass
+            print >> sys.stderr, "OperationalError"
 
 
 def getResumeUrl(urlid, url):
@@ -137,10 +138,13 @@ def getResumeUrl(urlid, url):
             conn.close()
             return url
         except sqlite3.OperationalError:
-            pass
+            print >> sys.stderr, "OperationalError"
 
 
 def clean():
-    conn = sqlite3.connect(dbname)
-    conn.execute("DELETE FROM VIDEOS WHERE URL IN (SELECT SITE FROM SITES);")
-    conn.close()
+    try:
+        conn = sqlite3.connect(dbname)
+        conn.execute("DELETE FROM VIDEOS WHERE URL IN (SELECT SITE FROM SITES);")
+        conn.close()
+    except sqlite3.OperationalError:
+        print >> sys.stderr, "OperationalError"
