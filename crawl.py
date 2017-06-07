@@ -10,11 +10,14 @@ from threading import Thread
 import sys
 import json
 import traceback
+import js2py
 
 
-def getDocSoup(url):
+def getDocSoup(url, cookie=""):
     try:
-        doc = urllib2.urlopen(url).read()
+        opener = urllib2.build_opener()
+        opener.addheaders.append(('Cookie', cookie))
+        doc = opener.open(url).read()
     except httplib.IncompleteRead, e:
         doc = e.partial
     return BeautifulSoup(doc, "lxml")
@@ -24,8 +27,8 @@ def compoundUrl(root, path):
     if not path.startswith("http"):
         urlRootIndex = root.find("/", 9)
         if urlRootIndex != -1:
-            url = root[:urlRootIndex]
-        path = url + path
+            root = root[:urlRootIndex]
+        path = root + path
     return path
 
 
@@ -81,7 +84,18 @@ def getLinks(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCh
     error = False
 
     if len(vidlinks) == 0:
-        raise Exception("NO VIDEOS FOUND: " + url)
+        try:
+            cookie = js2py.eval_js(re.sub(".*<!--", "", re.sub("//-->.*", "",
+                                                               rootpage.get_text().replace("document.cookie=",
+                                                                                           "return ").replace(
+                                                                   "document.location.reload(true);", "").replace(
+                                                                   "Loading ...", ""))) + " go()")
+            rootpage = getDocSoup(url)
+            vidlinks = eval(linkExtractor)
+        except:
+            pass
+        if len(vidlinks) == 0:
+            raise Exception("NO VIDEOS FOUND: " + url)
 
     for link in vidlinks:
         try:
@@ -118,7 +132,7 @@ def startCrawl(urlid, url, linkExtractor, nameExtractor, durationExtractor, date
 threads = []
 sites = dao.getSites()
 for site in sites:
-#for site in (sites[2], sites[5],):
+    # for site in (sites[4],):
     t = Thread(target=startCrawl, args=(site[0], site[1], site[2], site[3], site[4], site[5], site[6]))
     t.setDaemon(True)
     t.start()
