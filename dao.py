@@ -41,10 +41,6 @@ def addUrl(siteid, url, checkedstatus):
     while True:
         try:
             conn = sqlite3.connect(dbname)
-            if checkedstatus == -1:
-                cs = vidStatus(url)
-                if cs >= 0:
-                    checkedstatus = 2 + cs
             conn.execute(
                 "REPLACE INTO VIDEOS (ID, SITEID, URL, CHECKED) VALUES ((SELECT IFNULL(MAX(ID), 0) + 1 FROM VIDEOS),:siteid,:url,:checked);",
                 {"siteid": siteid, "url": url, "checked": checkedstatus})

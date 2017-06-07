@@ -62,10 +62,9 @@ def getVidUrl(link, url, nameExtractor, durationExtractor):
         raise
 
 
-def dateTagCheck(dateCheck, tagsExtractor, vidurl):
+def dateTagCheck(dateCheck, tagsExtractor, vidpage):
     try:
         error = False
-        vidpage = getDocSoup(vidurl)
         tags = []
         for tag in vidpage.select(tagsExtractor):
             tags.append(tag.get_text())
@@ -74,14 +73,13 @@ def dateTagCheck(dateCheck, tagsExtractor, vidurl):
             error = True
         return error
     except:
-        print >> sys.stderr, "DT error " + vidurl
+        print >> sys.stderr, "DT error"
         raise
 
 
 def getLinks(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCheck, tagsExtractor):
     rootpage = getDocSoup(url)
     vidlinks = eval(linkExtractor)
-    error = False
 
     if len(vidlinks) == 0:
         try:
@@ -90,7 +88,7 @@ def getLinks(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCh
                                                                                            "return ").replace(
                                                                    "document.location.reload(true);", "").replace(
                                                                    "Loading ...", ""))) + " go()")
-            rootpage = getDocSoup(url)
+            rootpage = getDocSoup(url, cookie)
             vidlinks = eval(linkExtractor)
         except:
             pass
@@ -103,17 +101,20 @@ def getLinks(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCh
             vidurl = vidtest["url"]
             error = vidtest["error"]
 
-            if dao.vidStatus(vidurl) < 2:
-                if not error: error = dateTagCheck(dateCheck, tagsExtractor, vidurl)
-                if not error:
-                    print "***\t" + vidurl
+            if dao.vidStatus(vidurl) == -1:
                 dao.addUrl(urlid, vidurl, 0 if error else 1)
             else:
                 print "\t--Duplicate video"
         except Exception, e:
             print >> sys.stderr, "GL " + type(e).__name__ + " " + str(e) + " " + url
 
-    dao.addUrl(urlid, url, -1)
+        status = dao.vidStatus(url)
+        if status == 1:
+            if not dateTagCheck(dateCheck, tagsExtractor, rootpage):
+                print "***\t" + vidurl
+            else:
+                status = 0;
+    dao.addUrl(urlid, url, status + 2)
 
 
 def startCrawl(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCheck, tagsExtractor):
