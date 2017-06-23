@@ -37,13 +37,31 @@ def init():
     conn.close()
 
 
-def addUrl(siteid, url, checkedstatus):
+def getId(url):
     while True:
         try:
             conn = sqlite3.connect(dbname)
+            cur = conn.cursor()
+            cur.execute("SELECT IFNULL((SELECT ID FROM VIDEOS WHERE URL=:url),IFNULL(MAX(ID), 0) + 1)  FROM VIDEOS;",
+                        {"url": url})
+            result = -1
+            for row in cur:
+                result = int(row[0])
+            conn.close()
+            return result
+        except sqlite3.OperationalError:
+            pass
+        break
+
+
+def addUrl(siteid, url, checkedstatus):
+    while True:
+        try:
+            vId = getId(url)
+            conn = sqlite3.connect(dbname)
             conn.execute(
-                "REPLACE INTO VIDEOS (ID, SITEID, URL, CHECKED) VALUES ((SELECT IFNULL(MAX(ID), 0) + 1 FROM VIDEOS),:siteid,:url,:checked);",
-                {"siteid": siteid, "url": url, "checked": checkedstatus})
+                "REPLACE INTO VIDEOS (ID, SITEID, URL, CHECKED) VALUES (:id,:siteid,:url,:checked);",
+                {"id": vId, "siteid": siteid, "url": url, "checked": checkedstatus})
             conn.commit()
             conn.close()
         except sqlite3.OperationalError:
@@ -63,17 +81,7 @@ def vidStatus(url):
             conn.close()
             return result
         except sqlite3.OperationalError:
-             pass
-
-
-def getUnchecked():
-    urls = []
-    conn = sqlite3.connect(dbname)
-    cur = conn.execute("SELECT URL FROM VIDEOS WHERE CHECKED = 0;")
-    for row in cur:
-        urls.append(str(row[0]))
-    conn.close()
-    return urls
+            pass
 
 
 def isBlackListed(tags):
@@ -143,3 +151,24 @@ def clean():
         conn.close()
     except sqlite3.OperationalError:
         pass
+
+
+def getToDownload():
+    while True:
+        try:
+            conn = sqlite3.connect(dbname)
+            cur = conn.execute(
+                '''SELECT ID, URL, SITEID, CHECKED FROM VIDEOS WHERE CHECKED IN (1, 3) ORDER BY RANDOM() LIMIT 1;''')
+            for val in cur:
+                vId = str(val[0])
+                url = str(val[1])
+                urlid = str(val[2])
+                checked = int(val[3])
+            conn.close()
+            return {"id": vId, "url": url, "urlid": urlid, "status": checked}
+        except sqlite3.OperationalError:
+            pass
+
+
+if __name__ == "__main__":
+    init()

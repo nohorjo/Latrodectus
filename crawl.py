@@ -11,6 +11,7 @@ import sys
 import json
 import traceback
 import js2py
+import downloader
 
 
 def getDocSoup(url, cookie=""):
@@ -78,22 +79,27 @@ def dateTagCheck(dateCheck, tagsExtractor, vidpage):
 
 
 def getLinks(urlid, url, linkExtractor, nameExtractor, durationExtractor, dateCheck, tagsExtractor):
-    rootpage = getDocSoup(url)
-    vidlinks = eval(linkExtractor)
+    try:
+        rootpage = getDocSoup(url)
+        vidlinks = eval(linkExtractor)
 
-    if len(vidlinks) == 0:
-        try:
-            cookie = js2py.eval_js(re.sub(".*<!--", "", re.sub("//-->.*", "",
-                                                               rootpage.get_text().replace("document.cookie=",
-                                                                                           "return ").replace(
-                                                                   "document.location.reload(true);", "").replace(
-                                                                   "Loading ...", ""))) + " go()")
-            rootpage = getDocSoup(url, cookie)
-            vidlinks = eval(linkExtractor)
-        except:
-            pass
         if len(vidlinks) == 0:
-            raise Exception("NO VIDEOS FOUND: " + url)
+            try:
+                cookie = js2py.eval_js(re.sub(".*<!--", "", re.sub("//-->.*", "",
+                                                                   rootpage.get_text().replace("document.cookie=",
+                                                                                               "return ").replace(
+                                                                       "document.location.reload(true);", "").replace(
+                                                                       "Loading ...", ""))) + " go()")
+                rootpage = getDocSoup(url, cookie)
+                vidlinks = eval(linkExtractor)
+            except:
+                pass
+            if len(vidlinks) == 0:
+                print >> sys.stderr, "NO VIDEOS FOUND: " + url
+                return
+    except (urllib2.HTTPError, urllib2.URLError), e:
+        print >> sys.stderr, "GL " + type(e).__name__ + " " + str(e) + " " + url
+        return
 
     for link in vidlinks:
         try:
@@ -130,19 +136,39 @@ def startCrawl(urlid, url, linkExtractor, nameExtractor, durationExtractor, date
         print "Finished crawl: " + url
 
 
-threads = []
-sites = dao.getSites()
-for site in sites:
-    # for site in (sites[4],):
-    t = Thread(target=startCrawl, args=(site[0], site[1], site[2], site[3], site[4], site[5], site[6]))
+def download():
+    while True:
+        try:
+            video = dao.getToDownload()
+            url = video["url"]
+            print "Dowloading " + url
+            outfile = "%s/%s" % (sys.argv[1], video["id"])
+            downloader.download(url, outfile)
+            dao.addUrl(video["urlid"], url, 4 if video["status"] == 3 else 5)
+            print "Downloaded " + url
+        except Exception, e:
+            print >> sys.stderr, "DL " + type(e).__name__ + " " + str(e) + " " + url
+            traceback.print_exc()
+
+
+if __name__ == "__main__":
+    threads = []
+    sites = dao.getSites()
+    for site in sites:
+        # for site in (sites[4],):
+        t = Thread(target=startCrawl, args=(site[0], site[1], site[2], site[3], site[4], site[5], site[6]))
+        t.setDaemon(True)
+        t.start()
+        threads.append(t)
+    t = Thread(target=download)
     t.setDaemon(True)
     t.start()
     threads.append(t)
 
-running = True
-while running:
-    running = False
-    for t in threads:
-        if t.isAlive():
-            running = True
-            break
+    running = True
+    while running:
+        running = False
+        for t in threads:
+            if t.isAlive():
+                running = True
+                break

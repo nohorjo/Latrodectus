@@ -5,21 +5,23 @@ import urllib2
 import urllib
 from bs4 import BeautifulSoup
 
-try:
-    vUrl = sys.argv[1]
-    outDir = sys.argv[2]
-except IndexError:
-    print "Error: provide a url and output directory"
-    exit(1)
 
-# uses savido to download video
-url = "http://www.savido.net/download?url=" + vUrl
+def download(vUrl, out):
+    # uses savido to download video
+    url = "http://www.savido.net/download?url=" + vUrl
 
-doc = urllib2.urlopen(url).read()
-soup = BeautifulSoup(doc, "lxml")
+    doc = urllib2.urlopen(url).read()
+    soup = BeautifulSoup(doc, "lxml")
 
-# get the download link
-vid = soup.select("td > a")[0].get("href")
+    # get the download link
+    vid = soup.select("td > a")[0].get("href")
 
-vUrl = vUrl[:-1]
-urllib.urlretrieve(vid, "%s/%s.mp4" % (outDir, vUrl[vUrl.rfind("/"):]))
+    urllib.urlretrieve(vid, "%s.mp4" % out)
+
+
+if __name__ == "__main__":
+    try:
+        download(sys.argv[1], sys.argv[2])
+    except IndexError:
+        print "Error: provide a url and output filename"
+        exit(1)
