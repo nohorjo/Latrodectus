@@ -154,16 +154,32 @@ def download():
 if __name__ == "__main__":
     threads = []
     sites = dao.getSites()
-    for site in sites:
-        # for site in (sites[4],):
-        t = Thread(target=startCrawl, args=(site[0], site[1], site[2], site[3], site[4], site[5], site[6]))
-        t.setDaemon(True)
-        t.start()
-        threads.append(t)
-    t = Thread(target=download)
-    t.setDaemon(True)
-    t.start()
-    threads.append(t)
+    
+    threadMultiplyier = 1
+    try:
+        threadMultiplyier = int(sys.argv[2])
+    except:
+        pass
+    
+    for i in range(0, threadMultiplyier):
+		for site in sites:
+			# for site in (sites[4],):
+			t = Thread(target=startCrawl, args=(site[0], site[1], site[2], site[3], site[4], site[5], site[6]))
+			t.setDaemon(True)
+			t.start()
+			threads.append(t)
+        
+    downloadThreads = 1
+    try:
+        downloadThreads = int(sys.argv[3])
+    except:
+        pass
+
+    for i in range(0, downloadThreads):
+		t = Thread(target=download)
+		t.setDaemon(True)
+		t.start()
+		threads.append(t)
 
     running = True
     while running:

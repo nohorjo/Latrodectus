@@ -133,7 +133,7 @@ def getResumeUrl(urlid, url):
         try:
             conn = sqlite3.connect(dbname)
             cur = conn.execute(
-                '''SELECT URL FROM VIDEOS WHERE ID = (SELECT ID FROM VIDEOS WHERE SITEID = :siteid AND CHECKED < 2
+                '''SELECT URL FROM VIDEOS WHERE ID = (SELECT ID FROM VIDEOS WHERE SITEID = :siteid AND CHECKED IN (0, 1, 5)
                     ORDER BY RANDOM() LIMIT 1);''',
                 {"siteid": urlid})
             for val in cur:
