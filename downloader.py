@@ -30,7 +30,7 @@ def downloadVids():
             outfile = "%s/%s" % (sys.argv[1], video["id"])
             download(url, outfile)
             dao.addUrl(video["urlid"], url, 4 if video["status"] == 3 else 5)
-            print "Downloaded " + url
+            print "--Downloaded " + url
         except Exception, e:
             print >> sys.stderr, "DL " + type(e).__name__ + " " + str(e) + " " + url
             traceback.print_exc()
