@@ -4,6 +4,9 @@ import sys
 import urllib2
 import urllib
 from bs4 import BeautifulSoup
+import traceback
+import dao
+from threading import Thread
 
 
 def download(vUrl, out):
@@ -18,10 +21,39 @@ def download(vUrl, out):
 
     urllib.urlretrieve(vid, "%s.mp4" % out)
 
+def downloadVids():
+    while True:
+        try:
+            video = dao.getToDownload()
+            url = video["url"]
+            print "Dowloading " + url
+            outfile = "%s/%s" % (sys.argv[1], video["id"])
+            download(url, outfile)
+            dao.addUrl(video["urlid"], url, 4 if video["status"] == 3 else 5)
+            print "Downloaded " + url
+        except Exception, e:
+            print >> sys.stderr, "DL " + type(e).__name__ + " " + str(e) + " " + url
+            traceback.print_exc()
 
 if __name__ == "__main__":
+    threads = []
+    downloadThreads = 1
     try:
-        download(sys.argv[1], sys.argv[2])
+        downloadThreads = int(sys.argv[2])
     except IndexError:
-        print "Error: provide a url and output filename"
-        exit(1)
+        pass
+
+    for i in range(0, downloadThreads):
+        t = Thread(target=downloadVids)
+        t.setDaemon(True)
+        t.start()
+        threads.append(t)
+
+    running = True
+    while running:
+        running = False
+        for t in threads:
+            if t.isAlive():
+                running = True
+                break
+

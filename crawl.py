@@ -135,30 +135,14 @@ def startCrawl(urlid, url, linkExtractor, nameExtractor, durationExtractor, date
             traceback.print_exc()
         print "Finished crawl: " + url
 
-
-def download():
-    while True:
-        try:
-            video = dao.getToDownload()
-            url = video["url"]
-            print "Dowloading " + url
-            outfile = "%s/%s" % (sys.argv[1], video["id"])
-            downloader.download(url, outfile)
-            dao.addUrl(video["urlid"], url, 4 if video["status"] == 3 else 5)
-            print "Downloaded " + url
-        except Exception, e:
-            print >> sys.stderr, "DL " + type(e).__name__ + " " + str(e) + " " + url
-            traceback.print_exc()
-
-
 if __name__ == "__main__":
     threads = []
     sites = dao.getSites()
     
     threadMultiplyier = 1
     try:
-        threadMultiplyier = int(sys.argv[2])
-    except:
+        threadMultiplyier = int(sys.argv[1])
+    except IndexError:
         pass
     
     for i in range(0, threadMultiplyier):
@@ -168,18 +152,6 @@ if __name__ == "__main__":
 			t.setDaemon(True)
 			t.start()
 			threads.append(t)
-        
-    downloadThreads = 1
-    try:
-        downloadThreads = int(sys.argv[3])
-    except:
-        pass
-
-    for i in range(0, downloadThreads):
-		t = Thread(target=download)
-		t.setDaemon(True)
-		t.start()
-		threads.append(t)
 
     running = True
     while running:
